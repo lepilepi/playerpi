@@ -1,5 +1,6 @@
-from time import sleep
+from time import sleep, time
 import subprocess
+import threading
 import os
 import RPi.GPIO as GPIO
 from settings import MEDIA_PATH
@@ -84,46 +85,88 @@ def get_next_track():
         return next_track
 
 def get_prev_track():
-    # print state['current_sec'], state['current_track'].prev
     if state['current_sec'] <= 3 and state['current_track'].prev:
         return state['current_track'].prev
     else:
         return state['current_track']
 
+def get_next_folder():
+    next_folder_index = folders.index(state['current_track'].folder) + 1
+    if next_folder_index >= len(folders):
+        next_folder = folders[0]
+    else:
+        next_folder = folders[next_folder_index]
+    return next_folder.tracks[0]
 
-popen = subprocess.Popen(['mpg321', '-g', '100', '-R', 'anyword'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
+def get_prev_folder():
+    folder_index = folders.index(state['current_track'].folder)
+    if folder_index >= 1:
+        prev_folder = folders[folder_index - 1]
+    else:
+        prev_folder = folders[-1]
+    return prev_folder.tracks[0]
+
+
+popen = subprocess.Popen(['mpg321', '-g', '50', '-R', 'anyword'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 def load(track):
     state['current_track'] = track
     cmd = 'LOAD %s\n' % track.full_path
-    # print(cmd)
+    logging.info(cmd)
     popen.stdin.write(cmd)
 
 def play_pause_button(channel):
     popen.stdin.write('PAUSE\n')
     # TODO: SAVE
 
-def prev_button(channel):
-    load(get_prev_track())
-    # TODO: SAVE
+button_state = {
+    'down': False,
+}
+
+
+def pressed_time(channel):
+    if GPIO.input(channel): # up
+        button_state['down'] = False
+    else: # down
+        if not button_state['down']:
+            button_state['down'] = True
+
+            for i in range(100):
+                sleep(0.01)
+                if GPIO.input(channel) == 1:
+                    # released
+                    button_state['down'] = False
+                    return "short"
+            return "long"
 
 def next_button(channel):
-    # print("next button pressed")
-    load(get_next_track())
+    t = pressed_time(channel)
+    if t == 'short':
+        load(get_next_track())
+    elif t == 'long':
+        load(get_next_folder())
     # TODO: SAVE
 
-GPIO.add_event_detect(22, GPIO.FALLING, callback=prev_button, bouncetime=300)
+def prev_button(channel):
+    t = pressed_time(channel)
+    if t == 'short':
+        load(get_prev_track())
+    elif t == 'long':
+        load(get_prev_folder())
+    # TODO: SAVE
+
+GPIO.add_event_detect(22, GPIO.BOTH, callback=prev_button, bouncetime=50)
 GPIO.add_event_detect(23, GPIO.FALLING, callback=play_pause_button, bouncetime=300)
-GPIO.add_event_detect(24, GPIO.FALLING, callback=next_button, bouncetime=300)
+GPIO.add_event_detect(24, GPIO.BOTH, callback=next_button, bouncetime=50)
 
 
 for line in iter(popen.stdout.readline, ""):
-    logging.debug(line)
     if line == '@R MPG123\n':
+        # saved previous
         load(folders[0].tracks[0])
     elif line == '@P 3\n':
         pass
-        # TODO: start next one
+        # TODO: start next one when finished
     elif line.startswith('@F'):
         state['current_frame'] = int(line.split()[1])
         state['current_sec'] = float(line.split()[3])
