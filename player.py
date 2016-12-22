@@ -116,9 +116,8 @@ GPIO.add_event_detect(22, GPIO.FALLING, callback=prev_button, bouncetime=300)
 GPIO.add_event_detect(23, GPIO.FALLING, callback=play_pause_button, bouncetime=300)
 GPIO.add_event_detect(24, GPIO.FALLING, callback=next_button, bouncetime=300)
 
-# for line in iter(popen.stdout.readline, ""):
-while True:
-    line = popen.stdout.readline()
+
+for line in iter(popen.stdout.readline, ""):
     logging.debug(line)
     if line == '@R MPG123\n':
         load(folders[0].tracks[0])
@@ -128,17 +127,3 @@ while True:
     elif line.startswith('@F'):
         state['current_frame'] = int(line.split()[1])
         state['current_sec'] = float(line.split()[3])
-    
-
-
-# p.stdin.write('LOAD mp3/rj/546aa00.mp3\n')
-# sleep(2)
-# p.stdin.write('PAUSE\n')
-# sleep(2)
-# p.stdin.write('PAUSE\n')
-# sleep(2)
-# p.stdin.write('STOP\n')
-# sleep(2)
-
-
-# p.kill()
