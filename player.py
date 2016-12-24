@@ -2,6 +2,7 @@ from time import sleep, time
 import subprocess
 import threading
 import os
+import sys
 import RPi.GPIO as GPIO
 from settings import MEDIA_PATH, PREV_BUTTON_PIN, PLAY_BUTTON_PIN, NEXT_BUTTON_PIN
 import redis
@@ -193,15 +194,28 @@ GPIO.add_event_detect(PREV_BUTTON_PIN, GPIO.BOTH, callback=prev_button, bounceti
 GPIO.add_event_detect(PLAY_BUTTON_PIN, GPIO.FALLING, callback=play_pause_button, bouncetime=300)
 GPIO.add_event_detect(NEXT_BUTTON_PIN, GPIO.BOTH, callback=next_button, bouncetime=50)
 
-
-for line in iter(popen.stdout.readline, ""):
-    if line == '@R MPG123\n':
-        # saved previous
-        load(*get_continue_from())
-    elif line == '@P 3\n':
-        # start next track when finished
-        load(get_next_track())
-    elif line.startswith('@F'):
-        # store current frame and elapsed seconds
-        state['current_frame'] = int(line.split()[1])
-        state['current_sec'] = float(line.split()[3])
+try:
+    for line in iter(popen.stdout.readline, ""):
+        if line == '@R MPG123\n':
+            # saved previous
+            load(*get_continue_from())
+        elif line == '@P 3\n':
+            # start next track when finished
+            load(get_next_track())
+        elif line.startswith('@F'):
+            # store current frame and elapsed seconds
+            state['current_frame'] = int(line.split()[1])
+            state['current_sec'] = float(line.split()[3])
+except KeyboardInterrupt:
+    logging.info("KeyboardInterrupt")
+except Exception as e:
+    logging.error('%s' % e)
+finally:
+    logging.info("Terminating mpg321 process...")
+    popen.terminate()
+    logging.info("Closing threads...")
+    led_thread_run_event.clear()
+    logging.info("Cleaning up GPIO...")
+    GPIO.cleanup()
+    logging.info("Exiting program...")
+    sys.exit()
