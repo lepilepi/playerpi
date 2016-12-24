@@ -243,19 +243,21 @@ def pressed_time(channel):
             return "long"
 
 def next_button(channel):
-    led_thread_queue.put(STATUS.loading)
     t = pressed_time(channel)
     if t == 'short':
+        led_thread_queue.put(STATUS.loading)
         load(get_next_track())
     elif t == 'long':
+        led_thread_queue.put(STATUS.loading)
         load(get_next_folder())
 
 def prev_button(channel):
-    led_thread_queue.put(STATUS.loading)
     t = pressed_time(channel)
     if t == 'short':
+        led_thread_queue.put(STATUS.loading)
         load(get_prev_track())
     elif t == 'long':
+        led_thread_queue.put(STATUS.loading)
         load(get_prev_folder())
 
 GPIO.add_event_detect(PREV_BUTTON_PIN, GPIO.BOTH, callback=prev_button, bouncetime=50)
