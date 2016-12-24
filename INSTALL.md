@@ -16,16 +16,13 @@
 
 `sudo mkdir -p /mnt/usb/`
 
-## AUto-mount with fstab
+## Auto-mount with fstab
 
 `sudo nano /etc/fstab`
 
 add these line (replace `/dev/sda/`):
 `/dev/sda        /mnt/usb        vfat    auto,nofail,noatime,users,rw,uid=pi,gid=pi 0 0`
 
-
-## Install mpg321
-`sudo apt-get install mpg321`
 
 ## Update fw (optional)
 `sudo apt-get install rpi-update`
@@ -35,22 +32,22 @@ add these line (replace `/dev/sda/`):
 Edit `/boot/config.txt`, add this line:
 `audio_pwm_mode=2`
 
+
+## Install packages
+`sudo apt-get install mpg321 redis-server python-pip`
+
+
 ## Volume
 Set volume in `alsamixer` to full, then store it with:
 `sudo alsactl store`
 
 
-## Redis
-`sudo apt-get install redis-server`
-`sudo apt-get install python-pip`
-`sudo pip install redis`
+## Redis conf
 Set `appendonly yes` in `/etc/redis/redis.conf` (for immediate persistence)
 
 
-## Bonjour (Optional)
-`sudo apt-get install libnss-mdns`
-`ssh pi@raspberrypi.local`
-
+## Install python packages
+`sudo pip install -r requirements.txt`
 
 ## Run
 `python player.py`
