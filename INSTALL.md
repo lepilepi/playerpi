@@ -35,5 +35,22 @@ add these line (replace `/dev/sda/`):
 Edit `/boot/config.txt`, add this line:
 `audio_pwm_mode=2`
 
+## Volume
+Set volume in `alsamixer` to full, then store it with:
+`sudo alsactl store`
+
+
+## Redis
+`sudo apt-get install redis-server`
+`sudo apt-get install python-pip`
+`sudo pip install redis`
+Set `appendonly yes` in `/etc/redis/redis.conf` (for immediate persistence)
+
+
+## Bonjour (Optional)
+`sudo apt-get install libnss-mdns`
+`ssh pi@raspberrypi.local`
+
+
 ## Run
 `python player.py`
