@@ -1,10 +1,13 @@
 from time import sleep, time
 import subprocess
 import threading
+from Queue import Queue
 import os
 import sys
 import RPi.GPIO as GPIO
-from settings import MEDIA_PATH, PREV_BUTTON_PIN, PLAY_BUTTON_PIN, NEXT_BUTTON_PIN
+from settings import MEDIA_PATH, PREV_BUTTON_PIN, PLAY_BUTTON_PIN, \
+    NEXT_BUTTON_PIN, STATUS_LED_PIN
+from enum import Enum
 import redis
 redis_db = redis.StrictRedis()
 
@@ -19,6 +22,53 @@ GPIO.setmode(GPIO.BCM)
 GPIO.setup(PREV_BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(PLAY_BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(NEXT_BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+
+# LED pin as output
+GPIO.setup(STATUS_LED_PIN, GPIO.OUT)
+GPIO.output(STATUS_LED_PIN, 0)
+
+
+class STATUS(Enum):
+    nothing = 0
+    playing = 1
+    loading = 2
+    error = 3
+
+
+led_thread_queue = Queue()
+def status_led_func():
+    c = 0
+    status = STATUS.loading
+    while True:
+        if not led_thread_queue.empty():
+            status = led_thread_queue.get_nowait()
+
+        if status == None:
+            break # Finish this thread
+
+        if status == STATUS.nothing and GPIO.input(STATUS_LED_PIN) == 1:
+            GPIO.output(STATUS_LED_PIN, 0)
+        elif status == STATUS.playing:
+            GPIO.output(STATUS_LED_PIN, (GPIO.input(STATUS_LED_PIN) + 1) % 2)
+            sleep(0.4)
+        elif status == STATUS.loading:
+            GPIO.output(STATUS_LED_PIN, (GPIO.input(STATUS_LED_PIN) + 1) % 2)
+            sleep(0.1)
+        elif status == STATUS.error:
+            if c == 0:
+                GPIO.output(STATUS_LED_PIN, 0)
+            elif c < 7:
+                GPIO.output(STATUS_LED_PIN, (GPIO.input(STATUS_LED_PIN) + 1) % 2)
+            c += 1
+            c %= 12
+            sleep(0.05)
+
+        sleep(0.0001)
+
+
+# start led thread
+threading.Thread(target=status_led_func).start()
 
 
 state = {
@@ -69,8 +119,20 @@ all_folders = [Folder(name) for name in sorted(os.listdir(MEDIA_PATH))]
 folders = [f for f in all_folders if f.tracks] # filter out empty folders
 
 if not folders:
-    pass
-    # TODO: display error message (espeak?)
+    led_thread_queue.put(STATUS.error)
+    # TODO: say error with espeak?
+    try:
+        while True:
+            sleep(0.0001)
+    except KeyboardInterrupt:
+        logging.info("Closing threads...")
+        led_thread_queue.put(None)
+        logging.info("Cleaning up GPIO...")
+        GPIO.cleanup()
+        logging.info("Exiting program...")
+        sys.exit()
+
+
 
 def get_continue_from():
     logging.info('Loading previous:')
@@ -152,6 +214,7 @@ def load(track, frame=0):
     save()
 
 def play_pause_button(channel):
+    led_thread_queue.put(STATUS.nothing)
     popen.stdin.write('PAUSE\n')
     save()
 
@@ -175,20 +238,20 @@ def pressed_time(channel):
             return "long"
 
 def next_button(channel):
+    led_thread_queue.put(STATUS.loading)
     t = pressed_time(channel)
     if t == 'short':
         load(get_next_track())
     elif t == 'long':
         load(get_next_folder())
-    # TODO: SAVE
 
 def prev_button(channel):
+    led_thread_queue.put(STATUS.loading)
     t = pressed_time(channel)
     if t == 'short':
         load(get_prev_track())
     elif t == 'long':
         load(get_prev_folder())
-    # TODO: SAVE
 
 GPIO.add_event_detect(PREV_BUTTON_PIN, GPIO.BOTH, callback=prev_button, bouncetime=50)
 GPIO.add_event_detect(PLAY_BUTTON_PIN, GPIO.FALLING, callback=play_pause_button, bouncetime=300)
@@ -206,6 +269,9 @@ try:
             # store current frame and elapsed seconds
             state['current_frame'] = int(line.split()[1])
             state['current_sec'] = float(line.split()[3])
+        elif line.startswith('@S') or line == '@P 2\n':
+            led_thread_queue.put(STATUS.playing)
+
 except KeyboardInterrupt:
     logging.info("KeyboardInterrupt")
 except Exception as e:
@@ -214,7 +280,7 @@ finally:
     logging.info("Terminating mpg321 process...")
     popen.terminate()
     logging.info("Closing threads...")
-    led_thread_run_event.clear()
+    led_thread_queue.put(None)
     logging.info("Cleaning up GPIO...")
     GPIO.cleanup()
     logging.info("Exiting program...")
