@@ -165,8 +165,9 @@ for line in iter(popen.stdout.readline, ""):
         # saved previous
         load(folders[0].tracks[0])
     elif line == '@P 3\n':
-        pass
-        # TODO: start next one when finished
+        # start next track when finished
+        load(get_next_track())
     elif line.startswith('@F'):
+        # store current frame and elapsed seconds
         state['current_frame'] = int(line.split()[1])
         state['current_sec'] = float(line.split()[3])
