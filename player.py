@@ -12,8 +12,13 @@ import redis
 redis_db = redis.StrictRedis()
 
 import logging
-logging.basicConfig(filename='player.log',level=logging.DEBUG)
-logging.info('\nStarting...')
+from logging.handlers import RotatingFileHandler
+logger = logging.getLogger('my_logger')
+logger.setLevel(logging.DEBUG)
+handler = RotatingFileHandler(filename='player.log', maxBytes=5*1024*1024, backupCount=5)
+logger.addHandler(handler)
+
+logger.info('\nStarting...')
 
 
 GPIO.setmode(GPIO.BCM)
@@ -125,29 +130,29 @@ if not folders:
         while True:
             sleep(0.0001)
     except KeyboardInterrupt:
-        logging.info("Closing threads...")
+        logger.info("Closing threads...")
         led_thread_queue.put(None)
-        logging.info("Cleaning up GPIO...")
+        logger.info("Cleaning up GPIO...")
         GPIO.cleanup()
-        logging.info("Exiting program...")
+        logger.info("Exiting program...")
         sys.exit()
 
 
 
 def get_continue_from():
-    logging.info('Loading previous:')
+    logger.info('Loading previous:')
     continue_from = redis_db.hgetall('continue_from')
-    logging.info('\tcontinue_from: %s' % continue_from)
+    logger.info('\tcontinue_from: %s' % continue_from)
     if 'folder' in continue_from and 'track' in continue_from and 'frame' in continue_from:
         folder = next((f for f in folders if f.name == continue_from['folder']), None)
         if folder:
-            logging.info('\tFolder found: %s' % folder)
+            logger.info('\tFolder found: %s' % folder)
             track = next((t for t in folder.tracks if t.name == continue_from['track']), None)
             if track and os.path.exists(track.full_path):
-                logging.info('\tTrack found: %s' % track)
+                logger.info('\tTrack found: %s' % track)
                 return track, int(continue_from['frame'])
 
-    logging.info('\tNo folder or track found. Falling back to the first one.')
+    logger.info('\tNo folder or track found. Falling back to the first one.')
     return folders[0].tracks[0], 0
 
 def save():
@@ -156,7 +161,7 @@ def save():
         'track': state['current_track'].name, 
         'frame': state['current_frame']}
     redis_db.hmset('continue_from', data)
-    logging.info('Saved: %s' % data)
+    logger.info('Saved: %s' % data)
 
 
 def get_next_track():
@@ -203,12 +208,12 @@ def load(track, frame=0):
     state['current_track'] = track
     state['current_frame'] = frame
     cmd = 'LOAD %s\n' % track.full_path
-    logging.info(cmd)
+    logger.info(cmd)
     popen.stdin.write(cmd)
 
     if not frame == 0:
         cmd = 'JUMP %s\n' % frame
-        logging.info(cmd)
+        logger.info(cmd)
         popen.stdin.write(cmd)
 
     save()
@@ -273,15 +278,15 @@ try:
             led_thread_queue.put(STATUS.playing)
 
 except KeyboardInterrupt:
-    logging.info("KeyboardInterrupt")
+    logger.info("KeyboardInterrupt")
 except Exception as e:
-    logging.error('%s' % e)
+    logger.error('%s' % e)
 finally:
-    logging.info("Terminating mpg321 process...")
+    logger.info("Terminating mpg321 process...")
     popen.terminate()
-    logging.info("Closing threads...")
+    logger.info("Closing threads...")
     led_thread_queue.put(None)
-    logging.info("Cleaning up GPIO...")
+    logger.info("Cleaning up GPIO...")
     GPIO.cleanup()
-    logging.info("Exiting program...")
+    logger.info("Exiting program...")
     sys.exit()
