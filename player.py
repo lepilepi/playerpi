@@ -15,7 +15,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 logger = logging.getLogger('my_logger')
 logger.setLevel(logging.DEBUG)
-handler = RotatingFileHandler(filename='player.log', maxBytes=5*1024*1024, backupCount=5)
+handler = RotatingFileHandler(filename='/var/log/player/player.log', maxBytes=5*1024*1024, backupCount=5)
 logger.addHandler(handler)
 
 logger.info('\nStarting...')
