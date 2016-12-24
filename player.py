@@ -3,7 +3,7 @@ import subprocess
 import threading
 import os
 import RPi.GPIO as GPIO
-from settings import MEDIA_PATH
+from settings import MEDIA_PATH, PREV_BUTTON_PIN, PLAY_BUTTON_PIN, NEXT_BUTTON_PIN
 
 import logging
 logging.basicConfig(filename='player.log',level=logging.DEBUG)
@@ -11,10 +11,10 @@ logging.basicConfig(filename='player.log',level=logging.DEBUG)
 
 GPIO.setmode(GPIO.BCM)
 
-# GPIO 23 set up as input. It is pulled up to stop false signals  
-GPIO.setup(22, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(23, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.setup(24, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+# Set up button pins as input, pulled-up.
+GPIO.setup(PREV_BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(PLAY_BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(NEXT_BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 
 state = {
@@ -155,9 +155,9 @@ def prev_button(channel):
         load(get_prev_folder())
     # TODO: SAVE
 
-GPIO.add_event_detect(22, GPIO.BOTH, callback=prev_button, bouncetime=50)
-GPIO.add_event_detect(23, GPIO.FALLING, callback=play_pause_button, bouncetime=300)
-GPIO.add_event_detect(24, GPIO.BOTH, callback=next_button, bouncetime=50)
+GPIO.add_event_detect(PREV_BUTTON_PIN, GPIO.BOTH, callback=prev_button, bouncetime=50)
+GPIO.add_event_detect(PLAY_BUTTON_PIN, GPIO.FALLING, callback=play_pause_button, bouncetime=300)
+GPIO.add_event_detect(NEXT_BUTTON_PIN, GPIO.BOTH, callback=next_button, bouncetime=50)
 
 
 for line in iter(popen.stdout.readline, ""):

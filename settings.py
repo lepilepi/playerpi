@@ -1,1 +1,4 @@
 MEDIA_PATH = '/mnt/usb/hangoskonyvek/'
+PREV_BUTTON_PIN = 22
+PLAY_BUTTON_PIN = 23
+NEXT_BUTTON_PIN = 24
