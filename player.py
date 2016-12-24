@@ -4,9 +4,12 @@ import threading
 import os
 import RPi.GPIO as GPIO
 from settings import MEDIA_PATH, PREV_BUTTON_PIN, PLAY_BUTTON_PIN, NEXT_BUTTON_PIN
+import redis
+redis_db = redis.StrictRedis()
 
 import logging
 logging.basicConfig(filename='player.log',level=logging.DEBUG)
+logging.info('\nStarting...')
 
 
 GPIO.setmode(GPIO.BCM)
@@ -68,6 +71,30 @@ if not folders:
     pass
     # TODO: display error message (espeak?)
 
+def get_continue_from():
+    logging.info('Loading previous:')
+    continue_from = redis_db.hgetall('continue_from')
+    logging.info('\tcontinue_from: %s' % continue_from)
+    if 'folder' in continue_from and 'track' in continue_from and 'frame' in continue_from:
+        folder = next((f for f in folders if f.name == continue_from['folder']), None)
+        if folder:
+            logging.info('\tFolder found: %s' % folder)
+            track = next((t for t in folder.tracks if t.name == continue_from['track']), None)
+            if track and os.path.exists(track.full_path):
+                logging.info('\tTrack found: %s' % track)
+                return track, int(continue_from['frame'])
+
+    logging.info('\tNo folder or track found. Falling back to the first one.')
+    return folders[0].tracks[0], 0
+
+def save():
+    data = {
+        'folder': state['current_track'].folder.name, 
+        'track': state['current_track'].name, 
+        'frame': state['current_frame']}
+    redis_db.hmset('continue_from', data)
+    logging.info('Saved: %s' % data)
+
 
 def get_next_track():
     track = state['current_track']
@@ -109,20 +136,27 @@ def get_prev_folder():
 
 popen = subprocess.Popen(['mpg321', '-g', '50', '-R', 'anyword'], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
 
-def load(track):
+def load(track, frame=0):
     state['current_track'] = track
+    state['current_frame'] = frame
     cmd = 'LOAD %s\n' % track.full_path
     logging.info(cmd)
     popen.stdin.write(cmd)
 
+    if not frame == 0:
+        cmd = 'JUMP %s\n' % frame
+        logging.info(cmd)
+        popen.stdin.write(cmd)
+
+    save()
+
 def play_pause_button(channel):
     popen.stdin.write('PAUSE\n')
-    # TODO: SAVE
+    save()
 
 button_state = {
     'down': False,
 }
-
 
 def pressed_time(channel):
     if GPIO.input(channel): # up
@@ -163,7 +197,7 @@ GPIO.add_event_detect(NEXT_BUTTON_PIN, GPIO.BOTH, callback=next_button, bounceti
 for line in iter(popen.stdout.readline, ""):
     if line == '@R MPG123\n':
         # saved previous
-        load(folders[0].tracks[0])
+        load(*get_continue_from())
     elif line == '@P 3\n':
         # start next track when finished
         load(get_next_track())
