@@ -114,7 +114,7 @@ class Track(object):
 class Folder(object):
     def __init__(self, name):
         self.name = name
-        track_names = sorted([f for f in os.listdir(os.path.join(MEDIA_PATH, self.name)) if f.endswith('.mp3')])
+        track_names = sorted([f for f in os.listdir(os.path.join(MEDIA_PATH, self.name)) if not f.startswith('.') and f.endswith('.mp3')])
         self.tracks = [Track(self, name) for name in track_names]
 
     def __repr__(self):
