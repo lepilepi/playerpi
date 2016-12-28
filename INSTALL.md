@@ -49,5 +49,13 @@ Set `appendonly yes` in `/etc/redis/redis.conf` (for immediate persistence)
 ## Install python packages
 `sudo pip install -r requirements.txt`
 
-## Run
-`python player.py`
+## Create log dir
+`sudo mkdir -p /var/log/player/`
+
+
+## Add as a startup script
+`sudo nano /etc/rc.local`
+
+Append this BEFORE the `exit 0` line:
+
+`python /home/pi/hangoskonyv/player.py &`
